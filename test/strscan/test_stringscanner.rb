@@ -206,6 +206,24 @@ class TestStringScanner < Test::Unit::TestCase
     assert_equal 11, s.charpos
   end
 
+  def test_slice_chars
+    s = create_string_scanner("abcädeföghi")
+    assert_equal 0, s.charpos
+    assert_equal 0, s.pos
+    assert_equal "abcä", s.scan_until(/ä/)
+    assert_equal 4, s.charpos
+    assert_equal 5, s.pos
+    assert_equal "defö", s.scan_until(/ö/)
+    assert_equal 8, s.charpos
+    assert_equal 10, s.pos
+
+    assert_equal 1, s.slice_chars(0, 1)
+    assert_equal 2, s.slice_chars(1, 2)
+    assert_equal 3, s.slice_chars(1, 4)
+    assert_equal 4, s.slice_chars(0, 5)
+    assert_equal 4, s.slice_chars(5, 5)
+  end
+
   def test_charpos_not_use_string_methods
     string = +'abcädeföghi'
     scanner = create_string_scanner(string)
@@ -725,6 +743,21 @@ class TestStringScanner < Test::Unit::TestCase
     s = create_string_scanner("Fri Dec 12 1975 14:39")
     s.scan(/(\w+) (\w+) (\d+) /)
     assert_equal(4, s.size)
+  end
+
+  def test_capture?
+    s = create_string_scanner("Timestamp: Fri Dec 12 1975 14:39")
+    assert s.scan(/Timestamp: (Sat)?/)
+    refute_operator s, :capture?, 1
+
+    assert s.scan(/(\w+) (\w+) (\d+) /)
+    assert_operator s, :capture?, 1
+    assert_operator s, :capture?, 2
+    assert_operator s, :capture?, 3
+
+    assert s.scan(/(\d+)|([a-z]+) /)
+    assert_operator s, :capture?, 1
+    refute_operator s, :capture?, 2
   end
 
   def test_captures

@@ -451,6 +451,16 @@ strscan_get_charpos(VALUE self)
     return LONG2NUM(rb_enc_strlen(S_PBEG(p), CURPTR(p), rb_enc_get(p->str)));
 }
 
+static VALUE strscan_slice_chars(VALUE self, VALUE start, VALUE bytes)
+{
+    struct strscanner *p;
+
+    GET_SCANNER(self, p);
+    const char *begin = S_PBEG(p) + NUM2LONG(start);
+
+    return LONG2NUM(rb_enc_strlen(begin, begin + NUM2LONG(bytes), rb_enc_get(p->str)));
+}
+
 /*
  * call-seq: pos=(n)
  *
@@ -1206,6 +1216,37 @@ strscan_size(VALUE self)
     return INT2FIX(p->regs.num_regs);
 }
 
+static VALUE
+strscan_capture_p(VALUE self, VALUE idx) {
+    const char *name;
+    struct strscanner *p;
+    long i;
+
+    GET_SCANNER(self, p);
+    if (! MATCHED_P(p))        return Qnil;
+
+    switch (TYPE(idx)) {
+        case T_SYMBOL:
+            idx = rb_sym2str(idx);
+            /* fall through */
+        case T_STRING:
+            if (!RTEST(p->regex)) return Qnil;
+            RSTRING_GETMEM(idx, name, i);
+            i = name_to_backref_number(&(p->regs), p->regex, name, name + i, rb_enc_get(idx));
+            break;
+        default:
+            i = NUM2LONG(idx);
+    }
+
+    if (i < 0)
+        i += p->regs.num_regs;
+    if (i < 0)                 return Qnil;
+    if (i >= p->regs.num_regs) return Qnil;
+    if (p->regs.beg[i] == -1)  return Qnil;
+
+    return Qtrue;
+}
+
 /*
  * call-seq: captures
  *
@@ -1641,7 +1682,9 @@ Init_strscan(void)
     rb_define_method(StringScanner, "post_match",  strscan_post_match,  0);
     rb_define_method(StringScanner, "size",        strscan_size,        0);
     rb_define_method(StringScanner, "captures",    strscan_captures,    0);
+    rb_define_method(StringScanner, "capture?",    strscan_capture_p,   1);
     rb_define_method(StringScanner, "values_at",   strscan_values_at,  -1);
+    rb_define_method(StringScanner, "slice_chars", strscan_slice_chars, 2);
 
     rb_define_method(StringScanner, "rest",        strscan_rest,        0);
     rb_define_method(StringScanner, "rest_size",   strscan_rest_size,   0);
